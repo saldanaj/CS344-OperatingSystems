@@ -1,0 +1,243 @@
+#!/bin/bash 
+
+# Student: Joaquin Saldana 
+# Assignment 1 
+# This is an script that calculates the mean averages and medians from 
+# an input file of numbers either via stdin or a file  
+
+# first check if the syntax entered is correct 
+# if not then we need to terminate the program
+# 1 argument means the user entered whether rows or columns 
+# 2 arguments means the user entered whether rows or columsn AND the filename
+# Also checking that the user entered lowercase -r for rows or lowercase -c for columns  
+
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] 
+then 
+	echo "Correct syntax: stats {-rows | -cols} [input_file]" 1>&2
+	exit 1
+fi 
+
+# the first argument will be assigned to the variable argument 1 to determine if the user entered 
+# the correct syntax for row (-r*) or for columns (-c*) 
+argument1=$1
+
+if [[ "$argument1" = "-r"* ]] || [[ "$argument1" = "-c"* ]] 
+then 
+	echo -e "\n" 
+	echo "Thank you for entering the correct syntax "
+else 
+	echo "Correct syntax: stats {-rows | -columns} [input_file]" 1>&2
+	exit 2 
+fi 
+
+
+# if the program has continued it means the user passed the conditional test 
+# which checks the correct number of arguments were entered by the user 
+
+# first we will need to create the temporary file with the unique process id 
+# and the trap in the event there is an exit from the program the temp file is always removed
+  
+tempFile="TMP$$"
+#sortedRowLine="sortedRow$$"
+
+trap "rm -f $tempFile; echo \"Program terminating and tempFile has been removed\";" INT HUP TERM EXIT
+
+
+# next we need to check if the user entered a file name or is entering the data via stdin 
+# if the user did enter a filename, then we need to check the following 
+# a. does the file exists
+# b. is the file readable
+# c. does the file contain anything 
+
+# if user did not enter a filename when we read from cat 
+
+if test "$#" -eq 1
+then
+	echo -e "\n" 
+	echo "Please enter the numbers you wish to calculate" 
+	
+	# cat > $tempFile
+	while read line 
+	do 
+		echo -e "$line" >> $tempFile 
+	done 
+
+ 
+else 
+	tempFile=$2
+
+	# since the syntax contained a file name, we are going to check if the file 
+	# exists (-e), if it's readable (-r), and if it's not empty/have a size greater than 0 (-s) 
+	# if not, then the program will exit with a 3 exit status 
+
+	if [ -e $2 ] && [ -r $2 ] && [ -s $2 ]
+	then 
+		echo "The file exists, is readable, and is not empty" 
+	else 
+		echo "Program exiting: file does not exists, is unreadable, or is empty" 1>&2 
+		exit 3 
+	fi  
+fi 
+
+# now depending if the user selected -r or -c it will fall into the appropriate if branch 
+
+# if the user selected rows 
+
+if [[ "$argument1" = "-r"* ]]   
+then
+
+	echo -e "\n" 
+	echo -e "Calculating rows ... " 	
+	
+	# print the Average and Median column label 	 
+	echo -e "Average\tMedian\n"
+
+	# while loop that will continue as long as we can continue reading from $tempFile 
+	while read rowLine   
+	do
+		# declare the sum, count, average, and median variables.  There's no 
+		# no need to create temp files in this algorithm 
+	
+		sum=0
+		count=0
+		average=0
+		median=0
+		newNumerator=0
+
+		# we sort the row line by pushing it through the expand command to preprocess the characters 
+		# which is helpful for sorting. We then convert the spaces between the characters to new lines by 
+		# using the translate command.  We need to do this since sort only sorts information with new lines 
+		# when then re-convert the file by piping it back to the tr command to change the new line characters
+		# to spaces.     
+				
+		sortedRowLine=$(echo "$rowLine" | expand | tr ' ' '\n' |  sort -n | tr '\n' ' ' ) 	
+		
+		# For loop that is used to calculate all the numbers in the file 
+		# to find the sum and the total numbers counted 
+	
+		for i in $rowLine  
+		do 
+			count=$(expr $count + 1 ) 
+			sum=$(expr $sum + $i ) 
+		done
+		
+		# average calculation and displayed for each row 
+		newNumerator=$(expr $count / 2 ) 
+		average=$(expr \( $sum + $newNumerator \)  / $count )
+
+		#finding the median 
+
+		medianIndex=$(expr \( $count / 2 \) + 1 ) 
+
+		loopIndex=0
+
+		# we're declaring a new variable which will hold the the row after it's 
+		# sorted, but not after we have use the translate command to 
+		# remove the tabs in the file to spaces to avoid any problems with the 
+		# sort command 
+
+		# sortedRowLine=$(echo -e $rowLine | expand | sort -n )   
+			
+		for j in $sortedRowLine 
+		do 
+			loopIndex=$(expr $loopIndex + 1 ) 
+			
+			if [[ $loopIndex -eq $medianIndex ]]
+			then 
+				median=$j
+			fi 
+			
+		done  
+
+		echo -e "$average\t$median"
+ 
+	done < $tempFile  
+
+# if we branch into the else statement it means the user selected columns 
+# we dont have to check that the syntax is correct because we already did that 
+# earlier in the start of the program 
+
+else 
+
+	# declare variables needed to track the count, sum and loop counter 
+	# which will be the a variable 
+
+	sum=0
+	count=0
+	average=0
+	median=0
+	a=1
+	newNumerator=0
+	
+	# inform the user they've elected the option to calculate the columns 	
+	echo -e "\n" 
+	echo -e "Calculating columns ... " 
+
+	# we need to know the number of columns since it will be 
+	# our loop condition to terminate once we meet it so we 
+	# use the head command and -n option to get the first line 
+	# and word count the amount of numbers in the file which 
+	# are the beginning of each column and the value is stored 
+	# in the variable numColumns 
+	
+	numColumns=$( head -n1 $tempFile | wc -w )
+
+	echo -e "\n" 
+
+	echo -e "Average\tMedian" 
+ 
+	# entering the while loop that will perform the calculations as seen in the if statement 
+	# for the row selection 	
+	while [[ "$a" -le  "$numColumns" ]] 
+	do 
+		sum=0
+		count=0 
+		average=0
+		median=0
+	
+		# we  cut the first column from the temp file and sort it 
+		# and store it in the variable sortedColumn 
+		sortedColumn=$( cut -f $a $tempFile | sort -n )
+
+		# doing the same calculations as i did with the row if statement 
+		# we are going to sum up each number in the file 
+		# keep track of the  count, since it will be needed to perform the division 
+		# to find the average.  		
+		for i in $sortedColumn 
+		do
+			sum=$(expr $sum + $i ) 
+			count=$(expr $count + 1) 
+		done 
+		
+		newNumerator=$(expr $count / 2 ) 
+		average=$(expr \( $sum + $newNumerator \)  / $count )
+		
+		# average=$(expr $sum / $count ) 		
+
+		medianIndex=$(expr \( $count / 2 \) + 1 ) 
+		
+		loopIndex=0 
+
+		for b in $sortedColumn 
+		do 
+			loopIndex=$(expr $loopIndex + 1 ) 
+
+			if [[ $loopIndex -eq $medianIndex ]] 
+			then 
+				median=$b
+			fi 
+		done 
+
+		echo -e "$average\t$median" 
+		
+		# dont forget to increment the loop counter 
+		a=$(expr $a + 1 ) 	
+
+	done  < $tempFile 
+
+fi 
+
+
+
+
+
